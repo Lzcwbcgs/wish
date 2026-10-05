@@ -73,6 +73,35 @@ func TestFileSystemHandlerVolumeRoot(t *testing.T) {
 	testFileSystemRootOperations(t, root, dir)
 }
 
+func TestFileSystemHandlerUnavailableWorkingDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not allow removing the current working directory")
+	}
+	is := is.New(t)
+	root := t.TempDir()
+	cwd := filepath.Join(root, "cwd")
+	is.NoErr(os.Mkdir(cwd, 0o755))
+	t.Chdir(cwd)
+	// Resolving relative paths must fail safely when cwd no longer exists.
+	is.NoErr(os.Remove(cwd))
+	for _, tc := range []struct {
+		name, root, wantPrefix string
+	}{
+		{"relative root", ".", `failed to resolve root "."`},
+		{"relative path", root, `failed to resolve "a.txt"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := newFSTestHandler(t, tc.root).confined("a.txt")
+			if !errors.Is(err, fs.ErrNotExist) {
+				t.Fatalf("confined: got %v, want a wrapped not-exist error", err)
+			}
+			if !strings.HasPrefix(err.Error(), tc.wantPrefix) {
+				t.Fatalf("confined: got %q, want prefix %q", err, tc.wantPrefix)
+			}
+		})
+	}
+}
+
 // All fixtures stay in dir, including when root is an entire filesystem.
 func testFileSystemRootOperations(t *testing.T, root, dir string) {
 	t.Helper()
