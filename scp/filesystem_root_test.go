@@ -74,8 +74,10 @@ func TestFileSystemHandlerVolumeRoot(t *testing.T) {
 }
 
 func TestFileSystemHandlerUnavailableWorkingDirectory(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows does not allow removing the current working directory")
+	// Removing cwd makes filepath.Abs fail on Linux. Other platforms may
+	// still return a path or disallow removing the working directory.
+	if runtime.GOOS != "linux" {
+		t.Skip("requires Linux getwd behavior after removing the working directory")
 	}
 	is := is.New(t)
 	root := t.TempDir()
